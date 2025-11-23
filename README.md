@@ -69,7 +69,7 @@ FileSystemWatcher → Debounce Queue → Capture Engine → Backup Storage
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/file-guardian.git
+git clone https://github.com/zzdh-ZBS-Labs/file-guardian-monitor.git
 cd file-guardian
 dotnet build -c Release
 ```
@@ -77,7 +77,7 @@ dotnet build -c Release
 
 ### Binary Release
 
-Download the latest release from the [Releases](https://github.com/yourusername/file-guardian/releases) page.
+Download the latest release from the [Releases](https://github.com/zzdh-ZBS-Labs/file-guardian-monitor/releases) page.
 
 ## Configuration
 
@@ -241,21 +241,6 @@ If a file is deleted during capture:
 - Debounce pattern to handle rapid file changes
 - Retry logic with exponential backoff
 - Strategy pattern for capture methods (hardlink → stream copy)
-
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/improvement`)
-3. Commit changes (`git commit -am 'Add new feature'`)
-4. Push to branch (`git push origin feature/improvement`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
