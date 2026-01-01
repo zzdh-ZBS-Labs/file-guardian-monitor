@@ -2,25 +2,11 @@
 
 **Real-time file monitoring and preservation system designed to capture malware samples before deletion**
 
-[
-[
-[
-[
+
 
 ## Overview
 
-File Guardian is a specialized forensic tool built for malware analysts and security researchers. It monitors specified directories and automatically captures copies of files—**even those that are rapidly created and deleted**—using hardlink protection and aggressive file streaming techniques.
-
-### Key Features
-
-- 🛡️ **Hardlink Protection** - Creates instant hardlinks to prevent file deletion
-- ⚡ **Rapid Capture** - 200ms debounce window catches files before malware can delete them
-- 🔒 **Locked File Handles** - Maintains file access during copying to prevent tampering
-- 📋 **SHA-256 Hashing** - Automatic integrity verification for all captured files
-- 🔄 **Recovery Mode** - Attempts to recover files even after deletion events
-- 📊 **Detailed Logging** - Timestamped metadata logs with file paths, sizes, and hashes
-- 🎯 **Selective Monitoring** - Configurable paths, file size limits, and retry logic
-
+File Guardian is a specialized forensic tool built for malware analysts and security researchers. It monitors specified directories and automatically captures copies of files—**even those that are rapidly created and deleted**—using hardlink protection and aggressive file streaming techniques(...*edit*ACCORDING TO A.I.).
 
 ## Use Cases
 
@@ -28,9 +14,6 @@ File Guardian is a specialized forensic tool built for malware analysts and secu
 - **Incident Response** - Preserve evidence before adversaries can destroy it
 - **Forensic Investigation** - Monitor and backup critical directories in real-time
 - **Threat Hunting** - Capture suspicious file activity in monitored environments
-
-
-## How It Works
 
 ### Capture Strategy
 
@@ -47,16 +30,6 @@ File Guardian is a specialized forensic tool built for malware analysts and secu
     - Recovers partial captures when deletion is detected
     - Finalizes staged files with integrity verification
 
-### Architecture
-
-```
-FileSystemWatcher → Debounce Queue → Capture Engine → Backup Storage
-                                           ├─ Hardlink (instant)
-                                           ├─ Stream Copy (locked)
-                                           └─ SHA-256 Hash
-```
-
-
 ## Installation
 
 ### Prerequisites
@@ -64,16 +37,6 @@ FileSystemWatcher → Debounce Queue → Capture Engine → Backup Storage
 - Windows 10/11 or Windows Server 2016+
 - .NET 6.0 Runtime or later
 - Administrator privileges (required for hardlink creation)
-
-
-### Build from Source
-
-```bash
-git clone https://github.com/zzdh-ZBS-Labs/file-guardian-monitor.git
-cd file-guardian
-dotnet build -c Release
-```
-
 
 ### Binary Release
 
@@ -109,10 +72,8 @@ private static readonly long maxFileSizeBytes = 1000 * 1024 * 1024;
 
 ```bash
 # Run directly
-FileGuardian.exe
+$>FileGuardian.exe
 
-# Or via dotnet
-dotnet run --project FileGuardian.csproj
 ```
 
 
