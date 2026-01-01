@@ -48,7 +48,7 @@ Edit the configuration constants at the top of `Program.cs`:
 
 ```csharp
 // Monitor this directory (recursively)
-private static readonly string monitorPath = @"C:\Users\zbs-lab-d\AppData\";
+private static readonly string monitorPath = // User-provided at runtime
 
 // Save captured files here
 private static readonly string backupPath = @"C:\Backup\Captured";
