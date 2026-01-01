@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Security.Cryptography;
@@ -11,9 +11,9 @@ namespace FileGuardian
     class Program
     {
         // ===== CONFIGURATION =====
-        private static readonly string monitorPath = @"C:\Users\zbs-lab-d\AppData\";
+        private static string monitorPath = string.Empty; // User-provided at runtime
         private static readonly string backupPath = @"C:\Backup\Captured";
-        private static readonly int debounceMs = 200; // Aggressive debounce
+        private static readonly int debounceMs = 200;
         private static readonly int maxRetries = 5;
         private static readonly long maxFileSizeBytes = 1000 * 1024 * 1024; // 1GB
         // =========================
@@ -33,11 +33,21 @@ namespace FileGuardian
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("╔═══════════════════════════════════════════╗");
-            Console.WriteLine("║     FILE GUARDIAN MONITOR v3.0            ║");
+            Console.WriteLine("║     FILE GUARDIAN MONITOR v3.1            ║");
             Console.WriteLine("║   Malware Rapid-Deletion Prevention       ║");
             Console.WriteLine("╚═══════════════════════════════════════════╝");
             Console.ResetColor();
             Console.WriteLine();
+
+            // Get monitor path from command line or user input
+            monitorPath = GetMonitorPath(args);
+            if (string.IsNullOrEmpty(monitorPath))
+            {
+                LogError("No valid monitor path provided. Exiting...");
+                Console.WriteLine("Press any key to exit...");
+                Console.ReadKey();
+                return;
+            }
 
             // Validate directories
             if (!Directory.Exists(monitorPath))
@@ -91,6 +101,7 @@ namespace FileGuardian
             _ = Task.Run(() => ProcessPendingFiles(cts.Token));
 
             LogSuccess("File Guardian is active - capturing all files including deleted ones.");
+            LogInfo("Press 'Q' to quit.");
             Console.WriteLine();
 
             while (true)
@@ -105,6 +116,126 @@ namespace FileGuardian
                     await Task.Delay(1000);
                     break;
                 }
+            }
+        }
+
+        private static string GetMonitorPath(string[] args)
+        {
+            string path = string.Empty;
+
+            // Check command line arguments first
+            if (args.Length > 0)
+            {
+                path = args[0];
+                LogInfo($"Using path from command line: {path}");
+            }
+            else
+            {
+                // Interactive input
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Enter the directory path to monitor:");
+                Console.WriteLine("Examples:");
+                Console.WriteLine("  C:\\Users\\YourUser\\AppData");
+                Console.WriteLine("  C:\\Users\\YourUser\\Downloads");
+                Console.WriteLine("  C:\\Temp");
+                Console.ResetColor();
+                Console.Write("\nPath: ");
+
+                while (true)
+                {
+                    path = Console.ReadLine()?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Error: Path cannot be empty.");
+                        Console.ResetColor();
+                        Console.Write("Path: ");
+                        continue;
+                    }
+
+                    // Remove surrounding quotes if present
+                    path = path.Trim('"', '\'');
+
+                    // Validate path format
+                    if (!IsValidPath(path))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Error: Invalid path format: {path}");
+                        Console.ResetColor();
+                        Console.Write("Path: ");
+                        continue;
+                    }
+
+                    // Check if directory exists
+                    if (!Directory.Exists(path))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine($"Warning: Directory does not exist: {path}");
+                        Console.Write("Do you want to create it? (y/n): ");
+                        Console.ResetColor();
+
+                        var response = Console.ReadKey();
+                        Console.WriteLine();
+
+                        if (response.Key == ConsoleKey.Y)
+                        {
+                            try
+                            {
+                                Directory.CreateDirectory(path);
+                                LogSuccess($"Created directory: {path}");
+                                break;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine($"Error: Failed to create directory: {ex.Message}");
+                                Console.ResetColor();
+                                Console.Write("Path: ");
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            Console.Write("Path: ");
+                            continue;
+                        }
+                    }
+
+                    break;
+                }
+
+                Console.WriteLine();
+            }
+
+            return path;
+        }
+
+        private static bool IsValidPath(string path)
+        {
+            try
+            {
+                // Check for invalid characters
+                if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+                    return false;
+
+                // Try to get full path - will throw if invalid
+                string fullPath = Path.GetFullPath(path);
+
+                // Check if path is rooted (has drive letter or UNC path)
+                if (!Path.IsPathRooted(path))
+                    return false;
+
+                // Additional check for drive letter existence
+                string root = Path.GetPathRoot(fullPath);
+                if (string.IsNullOrEmpty(root))
+                    return false;
+
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -128,13 +259,9 @@ namespace FileGuardian
 
         private static void OnFileDeleted(object sender, FileSystemEventArgs e)
         {
-            // CRITICAL: File is being deleted - try emergency capture
             LogWarning($"[DELETED] {e.FullPath}");
-
-            // Remove from pending if still there
             pendingFiles.TryRemove(e.FullPath, out _);
 
-            // Try to recover from staging if it exists
             string stagingFile = GetStagingPath(e.FullPath);
             if (File.Exists(stagingFile))
             {
@@ -159,12 +286,10 @@ namespace FileGuardian
                     var now = DateTime.Now;
                     foreach (var kvp in pendingFiles.ToArray())
                     {
-                        // Check if file has been quiet for debounce period
                         if ((now - kvp.Value).TotalMilliseconds > debounceMs)
                         {
                             if (pendingFiles.TryRemove(kvp.Key, out _))
                             {
-                                // Prevent duplicate processing
                                 if (processingFiles.TryAdd(kvp.Key, 0))
                                 {
                                     _ = Task.Run(() => CaptureFileAsync(kvp.Key, token));
@@ -192,7 +317,6 @@ namespace FileGuardian
                 {
                     try
                     {
-                        // Check if file exists
                         if (!File.Exists(sourcePath))
                         {
                             LogWarning($"File already deleted: {Path.GetFileName(sourcePath)}");
@@ -202,7 +326,6 @@ namespace FileGuardian
 
                         var fileInfo = new FileInfo(sourcePath);
 
-                        // Check size
                         if (fileInfo.Length > maxFileSizeBytes)
                         {
                             LogWarning($"File too large ({fileInfo.Length / 1024 / 1024}MB): {Path.GetFileName(sourcePath)}");
@@ -210,7 +333,6 @@ namespace FileGuardian
                             return;
                         }
 
-                        // Build paths
                         string relativePath = Path.GetRelativePath(monitorPath, sourcePath);
                         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
                         string destDir = Path.Combine(backupPath, Path.GetDirectoryName(relativePath) ?? "");
@@ -222,24 +344,16 @@ namespace FileGuardian
                         Directory.CreateDirectory(destDir);
                         Directory.CreateDirectory(Path.GetDirectoryName(stagingPath));
 
-                        // STRATEGY 1: Try hardlink (instant, prevents deletion)
                         if (TryCreateHardLink(sourcePath, stagingPath))
                         {
                             LogSuccess($"✓ Hardlinked: {Path.GetFileName(sourcePath)} (protected from deletion)");
-
-                            // Now safely copy hardlink to final destination
                             await CopyWithHashAsync(stagingPath, destPath, sourcePath);
-
-                            // Cleanup staging hardlink
                             try { File.Delete(stagingPath); } catch { }
-
                             processingFiles.TryRemove(sourcePath, out _);
                             return;
                         }
 
-                        // STRATEGY 2: Stream copy with held file handle (prevents modification)
                         await CopyWithLockedHandleAsync(sourcePath, stagingPath, destPath, fileInfo);
-
                         processingFiles.TryRemove(sourcePath, out _);
                         return;
                     }
@@ -272,7 +386,6 @@ namespace FileGuardian
         {
             try
             {
-                // Hardlinks prevent file deletion - file won't be removed until all hardlinks are gone
                 return CreateHardLink(dest, source, IntPtr.Zero);
             }
             catch
@@ -284,20 +397,17 @@ namespace FileGuardian
         private static async Task CopyWithLockedHandleAsync(string sourcePath, string stagingPath,
             string destPath, FileInfo sourceInfo)
         {
-            // Open source file with aggressive sharing to keep handle alive during copy
             using (var sourceStream = new FileStream(sourcePath, FileMode.Open,
                 FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096,
                 FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                // Copy to staging first
                 using (var stagingStream = new FileStream(stagingPath, FileMode.Create,
                     FileAccess.Write, FileShare.None, 4096,
                     FileOptions.Asynchronous | FileOptions.SequentialScan))
                 {
-                    await sourceStream.CopyToAsync(stagingStream, 81920); // 80KB buffer
+                    await sourceStream.CopyToAsync(stagingStream, 81920);
                 }
 
-                // Calculate hash from source
                 sourceStream.Position = 0;
                 string hash;
                 using (var sha256 = SHA256.Create())
@@ -306,14 +416,10 @@ namespace FileGuardian
                     hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
                 }
 
-                // Copy staging to final destination
                 File.Copy(stagingPath, destPath, true);
-
-                // Preserve timestamps
                 File.SetCreationTime(destPath, sourceInfo.CreationTime);
                 File.SetLastWriteTime(destPath, sourceInfo.LastWriteTime);
 
-                // Cleanup staging
                 try { File.Delete(stagingPath); } catch { }
 
                 await LogMetadataAsync(destPath, sourcePath, sourceInfo.Length, hash);
